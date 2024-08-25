@@ -33,69 +33,95 @@ st.title("🤖 Bunmi - Interview Assistant ChatBot")
 # Step 1: Collect Input
 st.subheader("Upload CV, Job Description, and Company Details")
 
-cv = st.file_uploader("Upload your CV", type=["pdf", "docx", "txt"])
+cv = st.file_uploader("Upload your CV", type=["pdf"])
 job_description = st.text_area("Paste the Job Description here")
-company_details = st.text_input("Enter Company Details")
+company_details_url = st.text_input("Enter Company Details URL")
 
 if st.button("Submit Details"):
-    if not cv or not job_description or not company_details:
+    if not cv or not job_description or not company_details_url:
         st.error("Please provide all required information!")
     else:
-        st.success("Details received! Let's move on to the interview.")
+        st.success("Details received! Let's move on to the interview preparation.")
 
-# Step 2: Generate Interview Questions based on job description
-def generate_questions(job_description, company_details):
+# Step 2: Summarize Learnings
+def summarize_learnings(job_description, company_details_url):
     prompt = (
-        f"Generate interview questions based on the following job description: {job_description} "
-        f"and the company details: {company_details}. Focus on key skills and experiences required."
+        f"Act like a professional job interview coach.\n\n"
+        f"### Job Description ###\n{job_description}\n### Job Description ###\n\n"
+        f"### Company's Website ###\nBrowse the internet to get information from this website: {company_details_url}\n### Company's Website ###\n\n"
+        "Step 2: Write a quick summary of your learnings, and who you have to become in order to be my job interviewer."
     )
     response = model.send_message(prompt)
-    return response.text.split('\n')  # Assume each line is a separate question
+    return response.text
+
+summary = ""
+if job_description and company_details_url:
+    summary = summarize_learnings(job_description, company_details_url)
+    st.subheader("Learnings Summary")
+    st.write(summary)
+
+# Step 3: Read CV and Tailor Answers
+def tailor_answers(cv):
+    prompt = (
+        f"Step 3: Read my resume / CV (uploaded as a PDF) to tailor your perfect answers later on.\n\n"
+        f"CV Content:\n{cv}\n"
+    )
+    response = model.send_message(prompt)
+    return response.text
+
+if cv and summary:
+    tailored_summary = tailor_answers(cv.read().decode("utf-8"))
+    st.subheader("Tailored Interview Preparation")
+    st.write(tailored_summary)
+
+# Step 4: Start the Job Interview
+def start_interview(job_description):
+    prompt = (
+        f"Step 4: Start the job interview, one question at a time, like a real simulation.\n\n"
+        f"### Job Description ###\n{job_description}\n### Job Description ###"
+    )
+    response = model.send_message(prompt)
+    return response.text
 
 questions = []
-if job_description and company_details:
-    questions = generate_questions(job_description, company_details)
+if job_description:
+    questions = start_interview(job_description).split('\n')
 
-# Display generated questions and receive user responses
 responses = []
 if questions:
-    st.subheader("Interview Questions")
+    st.subheader("Job Interview Simulation")
     for idx, question in enumerate(questions):
         st.markdown(f"**Question {idx + 1}:** {question}")
         response = st.text_area(f"Your response to Question {idx + 1}", key=f"response_{idx}")
         if response:
             responses.append(response)
 
-# Step 3: Evaluate Responses using STAR Method
-def evaluate_star(response):
-    # Here we mock a STAR evaluation
-    star_feedback = "Your response should include: Situation, Task, Action, Result."
-    
-    # We could expand this by analyzing the response text, but this is a placeholder
-    if "situation" not in response.lower() or "task" not in response.lower() or \
-       "action" not in response.lower() or "result" not in response.lower():
-        star_feedback += " Some elements are missing."
-    else:
-        star_feedback += " Great job including all STAR elements!"
-    
-    return star_feedback
+# Step 5: Provide Detailed Feedback Using the CARL Method
+def provide_feedback(response, question):
+    prompt = (
+        f"Step 5: Once I answered, I want you to provide 5 paragraphs, divided by line breaks.\n\n"
+        f"Paragraph 1 = What was good in my answer?\n"
+        f"Paragraph 2 = What was bad in my answer?\n"
+        f"Paragraph 3 = What could be added to my answer?\n"
+        f"Paragraph 4 = Pretend you are me & write a detailed perfect answer using the CARL method.\n"
+        f"Paragraph 5 = Ask me if we can move on to the next interview question.\n\n"
+        f"My Answer: {response}\n\n"
+        f"Question: {question}"
+    )
+    feedback_response = model.send_message(prompt)
+    return feedback_response.text
 
 feedback = []
 if responses:
-    st.subheader("Feedback on Your Responses")
+    st.subheader("Detailed Feedback on Your Responses")
     for idx, response in enumerate(responses):
-        feedback.append(evaluate_star(response))
-        st.markdown(f"**Feedback for Question {idx + 1}:** {feedback[-1]}")
+        if response:
+            feedback_text = provide_feedback(response, questions[idx])
+            feedback.append(feedback_text)
+            st.markdown(f"**Feedback for Question {idx + 1}:**")
+            st.write(feedback_text)
 
-# Step 4: Provide Model Answers (Example Implementation)
-def generate_model_answer(question):
-    prompt = f"Provide a model answer using the STAR method for the following question: {question}"
-    response = model.send_message(prompt)
-    return response.text
-
+# Ask if ready to move on to the next question
 if feedback:
-    st.subheader("Model Answers")
-    for idx, question in enumerate(questions):
-        if st.button(f"Show Model Answer for Question {idx + 1}"):
-            model_answer = generate_model_answer(question)
-            st.markdown(f"**Model Answer for Question {idx + 1}:** {model_answer}")
+    if st.button("Move on to the next interview question?"):
+        st.write("Great! Let's continue...")
